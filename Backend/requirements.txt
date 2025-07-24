@@ -2,5 +2,4 @@
 flask
 flask-cors
 numpy
-tensorflow
 scikit-learn
