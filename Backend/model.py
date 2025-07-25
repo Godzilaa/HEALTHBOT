@@ -1,13 +1,6 @@
-import os
 import json
 import pickle
 import numpy as np
-
-# Suppress TensorFlow informational messages
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warnings, 3=errors only
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
-
 from tensorflow.keras.models import Sequential, model_from_json
 from tensorflow.keras.layers import Dense, Embedding, GlobalAveragePooling1D
 from tensorflow.keras.preprocessing.text import Tokenizer
