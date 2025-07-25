@@ -1,9 +1,9 @@
 # Python version requirement
 # Requires Python >=3.10,<3.11
-tensorflow==2.13.0
-Flask==2.3.3
-flask-cors==4.0.0
-numpy==1.24.4
-scikit-learn==1.3.0
+tensorflow
+Flask
+flask-cors
+numpy
+scikit-learn
 
 
