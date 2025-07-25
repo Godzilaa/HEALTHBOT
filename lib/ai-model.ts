@@ -14,13 +14,13 @@ interface ErrorResponse {
 
 // Configuration for the AI backend
 const AI_CONFIG = {
-  // Use environment variable or fallback to localhost
-  baseUrl: process.env.NEXT_PUBLIC_AI_API_URL || 'http://127.0.0.1:5000',
+  // Use your deployed Render backend URL
+  baseUrl: process.env.NEXT_PUBLIC_AI_API_URL || 'https://healthbot-3.onrender.com',
   endpoints: {
     chat: '/chat',
     health: '/health'
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 15000, // 15 second timeout for cloud deployment
   retries: 3
 };
 
