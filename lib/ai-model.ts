@@ -3,23 +3,29 @@ import * as tf from '@tensorflow/tfjs';
 // Define interfaces for our model data structure
 interface ModelData {
   model_config: {
-    layers: Array<{
-      class_name: string;
-      config: {
-        input_shape?: number[];
-        input_dim?: number;
-        output_dim?: number;
-        units?: number;
-        activation?: 'relu' | 'softmax' | 'sigmoid' | 'tanh' | 'linear';
-        name?: string;
-      };
-    }>;
+    class_name: string;
+    config: {
+      name: string;
+      layers: Array<{
+        module: string;
+        class_name: string;
+        config: {
+          name: string;
+          input_dim?: number;
+          output_dim?: number;
+          units?: number;
+          activation?: 'relu' | 'softmax' | 'sigmoid' | 'tanh' | 'linear';
+          input_length?: number;
+          batch_input_shape?: number[];
+        };
+      }>;
+    };
   };
   weights: number[][][];
   metadata: {
     vocab_size: number;
     max_len: number;
-    num_classes: number;
+    embedding_dim: number;
   };
   tokenizer: TokenizerData;
   label_encoder: LabelData;
@@ -30,7 +36,7 @@ interface TokenizerData {
 }
 
 interface LabelData {
-  classes_: string[];
+  classes: string[];
 }
 
 interface IntentData {
@@ -52,40 +58,73 @@ async function loadModel(): Promise<void> {
   if (model) return; // Already loaded
 
   try {
+    console.log('Loading model data...');
     // Load model data from public directory
     const response = await fetch('/Backend/chat_model.json');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch model: ${response.status} ${response.statusText}`);
+    }
     const modelData: ModelData = await response.json();
+    console.log('Model data loaded, structure:', Object.keys(modelData));
     
     // Load intents data
+    console.log('Loading intents data...');
     const intentsResponse = await fetch('/Backend/intents.json');
+    if (!intentsResponse.ok) {
+      throw new Error(`Failed to fetch intents: ${intentsResponse.status} ${intentsResponse.statusText}`);
+    }
     intentsData = await intentsResponse.json();
+    console.log('Intents loaded, count:', intentsData?.intents?.length || 0);
     
     // Extract tokenizer and label encoder from model data
     tokenizer = modelData.tokenizer;
     labelEncoder = modelData.label_encoder;
     metadata = modelData.metadata;
     
+    console.log('Metadata:', metadata);
+    console.log('Tokenizer word count:', Object.keys(tokenizer.word_index || {}).length);
+    console.log('Label classes count:', labelEncoder.classes?.length || 0);
+    
     // Create TensorFlow.js model manually from the architecture
+    console.log('Creating TensorFlow.js model...');
     model = tf.sequential();
     
     // Add layers based on the exported configuration
-    const layers = modelData.model_config.layers;
+    const layers = modelData.model_config.config.layers;
+    console.log('Layers to process:', layers.length);
     
     for (let i = 0; i < layers.length; i++) {
       const layer = layers[i];
+      console.log(`Processing layer ${i}: ${layer.class_name}`);
+      
+      // Skip InputLayer as it's handled automatically by TensorFlow.js
+      if (layer.class_name === 'InputLayer') {
+        console.log('Skipping InputLayer');
+        continue;
+      }
       
       if (layer.class_name === 'Embedding') {
+        console.log('Adding Embedding layer:', {
+          inputDim: layer.config.input_dim,
+          outputDim: layer.config.output_dim,
+          inputLength: layer.config.input_length
+        });
         model.add(tf.layers.embedding({
           inputDim: layer.config.input_dim!,
           outputDim: layer.config.output_dim!,
-          inputLength: metadata!.max_len,
+          inputLength: layer.config.input_length!,
           name: layer.config.name
         }));
       } else if (layer.class_name === 'GlobalAveragePooling1D') {
+        console.log('Adding GlobalAveragePooling1D layer');
         model.add(tf.layers.globalAveragePooling1d({
           name: layer.config.name
         }));
       } else if (layer.class_name === 'Dense') {
+        console.log('Adding Dense layer:', {
+          units: layer.config.units,
+          activation: layer.config.activation
+        });
         model.add(tf.layers.dense({
           units: layer.config.units!,
           activation: layer.config.activation,
@@ -95,10 +134,18 @@ async function loadModel(): Promise<void> {
     }
     
     // Set the weights
-    const weightArrays = modelData.weights.map(layerWeights => 
-      layerWeights.map(weightMatrix => tf.tensor(weightMatrix))
-    );
+    console.log('Loading model weights...');
+    console.log('Weights array length:', modelData.weights.length);
     
+    const weightArrays = modelData.weights.map((layerWeights, layerIndex) => {
+      console.log(`Layer ${layerIndex} weights:`, layerWeights.length, 'tensors');
+      return layerWeights.map((weightMatrix, weightIndex) => {
+        console.log(`  Weight ${weightIndex} shape:`, Array.isArray(weightMatrix) ? weightMatrix.length : 'scalar');
+        return tf.tensor(weightMatrix);
+      });
+    });
+    
+    console.log('Setting weights on model...');
     model.setWeights(weightArrays.flat());
     
     console.log('Model loaded successfully');
@@ -147,7 +194,7 @@ async function predict(text: string): Promise<string> {
     const maxIndex = predictionData.indexOf(Math.max(...predictionData));
     
     // Get the predicted label
-    const predictedLabel = labelEncoder.classes_[maxIndex];
+    const predictedLabel = labelEncoder.classes[maxIndex];
     
     // Find the corresponding intent and get a random response
     const intent = intentsData.intents.find(intent => intent.tag === predictedLabel);
