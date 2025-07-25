@@ -88,12 +88,8 @@ def export_model_to_json(model, tokenizer, label_encoder):
         }
     }
     
-    # Save to JSON file
-    with open('chat_model.json', 'w') as f:
-        json.dump(export_data, f, indent=2)
 
 # Export the model
-export_model_to_json(model, tokenizer, lbl_encoder)
 
 # Additional exports (optional)
 model.save('chat_model.h5')  # Traditional HDF5 format
@@ -101,5 +97,3 @@ with open('tokenizer.pickle', 'wb') as handle:
     pickle.dump(tokenizer, handle)
 with open('label_encoder.pickle', 'wb') as f:
     pickle.dump(lbl_encoder, f)
-
-print("Model successfully exported in JSON format to 'chat_model.json'")
